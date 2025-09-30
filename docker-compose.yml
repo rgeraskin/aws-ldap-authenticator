@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres-ldap
+    ports:
+      - 5432:5432
+    volumes:
+      # on fresh start remove the data directory
+      # then start the container
+      # then edit the pg_hba.conf file in the data directory
+      # 'host all /^prefix_.* all ldap ldapurl="ldap://host.docker.internal:3893" ldapprefix="cn=" ldapsuffix=",dc=glauth,dc=com"'
+      # then restart the container
+      - ./data/:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    restart: unless-stopped
