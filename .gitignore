@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-/broker
+/aws-ldap-authenticator
 
 # Test binary, built with `go test -c`
 *.test
@@ -52,3 +52,6 @@ glauth/
 
 # pg_hba.conf for testing
 pg_hba.conf
+
+# goreleaser
+/dist/

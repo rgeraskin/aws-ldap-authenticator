@@ -13,7 +13,7 @@ import (
 
 	"github.com/charmbracelet/log"
 
-	"aws-ldap-broker/internal/errors"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/errors"
 )
 
 // STSService handles STS operations

@@ -8,9 +8,9 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/glauth/ldap"
 
-	"aws-ldap-broker/internal/config"
-	"aws-ldap-broker/internal/errors"
-	"aws-ldap-broker/internal/services"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/config"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/errors"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/services"
 )
 
 // LDAPHandler handles LDAP operations

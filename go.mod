@@ -1,4 +1,4 @@
-module aws-ldap-broker
+module github.com/rgeraskin/aws-ldap-authenticator
 
 go 1.21
 

@@ -9,9 +9,9 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/glauth/ldap"
 
-	"aws-ldap-broker/internal/config"
-	"aws-ldap-broker/internal/handlers"
-	"aws-ldap-broker/internal/services"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/config"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/handlers"
+	"github.com/rgeraskin/aws-ldap-authenticator/internal/services"
 )
 
 func main() {

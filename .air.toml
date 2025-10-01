@@ -5,17 +5,9 @@ tmp_dir = "tmp"
 [build]
 args_bin = []
 bin = "./tmp/main"
-cmd = "go build -o ./tmp/main ./cmd/aws-ldap-broker/"
+cmd = "go build -o ./tmp/main ./cmd/aws-ldap-authenticator/"
 delay = 1000
-exclude_dir = [
-    "__pycache__",
-    "glauth",
-    "data",
-    "assets",
-    "tmp",
-    "vendor",
-    "testdata",
-]
+exclude_dir = ["dist/", "glauth", "data", "tmp"]
 exclude_file = []
 exclude_regex = ["_test.go"]
 exclude_unchanged = false
