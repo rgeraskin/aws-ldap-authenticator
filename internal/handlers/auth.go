@@ -185,7 +185,7 @@ func (h *AuthHandler) generateBindDNs(user *storage.User) []string {
 		fmt.Sprintf("cn=%s%s", user.Username, h.config.SuffixLDAP),
 	)
 
-	return unique(bindDNs)
+	return bindDNs
 }
 
 func (h *AuthHandler) writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
@@ -199,16 +199,4 @@ func (h *AuthHandler) writeJSON(w http.ResponseWriter, statusCode int, data inte
 func (h *AuthHandler) writeError(w http.ResponseWriter, appErr *errors.AppError) {
 	h.logger.Error("Request failed", "error", appErr.Error(), "code", appErr.Code)
 	h.writeJSON(w, appErr.Code, map[string]string{"error": appErr.Message})
-}
-
-func unique(slice []string) []string {
-	seen := make(map[string]bool)
-	result := []string{}
-	for _, item := range slice {
-		if !seen[item] {
-			seen[item] = true
-			result = append(result, item)
-		}
-	}
-	return result
 }

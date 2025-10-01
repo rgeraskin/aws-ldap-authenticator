@@ -29,7 +29,7 @@ func NewUserStore(cleanupInterval time.Duration) *UserStore {
 	}
 
 	// Start cleanup goroutine
-	go store.cleanupExpiredUsers()
+	go store.startCleanupTicker()
 
 	return store
 }
@@ -57,19 +57,24 @@ func (s *UserStore) Get(bindDN string) (*User, bool) {
 	return user, true
 }
 
-// cleanupExpiredUsers removes expired users at configured interval
-func (s *UserStore) cleanupExpiredUsers() {
+// startCleanupTicker starts the ticker for cleaning up expired users
+func (s *UserStore) startCleanupTicker() {
 	ticker := time.NewTicker(s.cleanupInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		s.mu.Lock()
-		now := time.Now()
-		for bindDN, user := range s.users {
-			if user.ExpiresAt.Before(now) {
-				delete(s.users, bindDN)
-			}
+		s.cleanupExpiredUsers()
+	}
+}
+
+// cleanupExpiredUsers removes expired users at configured interval
+func (s *UserStore) cleanupExpiredUsers() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now()
+	for bindDN, user := range s.users {
+		if user.ExpiresAt.Before(now) {
+			delete(s.users, bindDN)
 		}
-		s.mu.Unlock()
 	}
 }

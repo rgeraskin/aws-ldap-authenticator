@@ -60,11 +60,7 @@ func (s *STSService) DecodeEKSToken(eksToken string) (string, error) {
 	}
 
 	b64 := eksToken[len(prefix):]
-	// Add padding if missing
-	padding := strings.Repeat("=", (4-len(b64)%4)%4)
-	b64 += padding
-
-	decoded, err := base64.URLEncoding.DecodeString(b64)
+	decoded, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", errors.ErrMalformedTokenPayload, err)
 	}

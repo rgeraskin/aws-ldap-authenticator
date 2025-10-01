@@ -24,7 +24,10 @@ func NewLDAPHandler(userStore *storage.UserStore, logger *log.Logger) *LDAPHandl
 }
 
 // Bind handles LDAP bind requests
-func (h *LDAPHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
+func (h *LDAPHandler) Bind(
+	bindDN, bindSimplePw string,
+	conn net.Conn,
+) (ldap.LDAPResultCode, error) {
 	h.logger.Info("LDAP Bind request", "bindDN", bindDN, "remote_addr", conn.RemoteAddr())
 
 	user, exists := h.userStore.Get(bindDN)

@@ -14,7 +14,7 @@ type Config struct {
 	PasswordTTL      time.Duration
 	EKSClusterID     string
 	PrefixARN        string
-	SuffixLDAP       string // ",dc=glauth,dc=com" - pay attention to the leading comma
+	SuffixLDAP       string // optional, ",dc=glauth,dc=com" - pay attention to the leading comma
 	HostHTTP         string
 	PortHTTP         string
 	HostLDAP         string
@@ -62,59 +62,42 @@ func Load() (*Config, error) {
 	}
 
 	// Parse durations
-	passwordTTLSeconds, err := strconv.Atoi(
-		getEnv("PASSWORD_TTL_SECONDS", DefaultPasswordTTLSeconds),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid PASSWORD_TTL_SECONDS: %w", err)
+	var err error
+	if config.PasswordTTL, err = parseDuration(
+		"PASSWORD_TTL_SECONDS", DefaultPasswordTTLSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.PasswordTTL = time.Duration(passwordTTLSeconds) * time.Second
-
-	requestTimeoutSeconds, err := strconv.Atoi(
-		getEnv("REQUEST_TIMEOUT_SECONDS", DefaultRequestTimeoutSeconds),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid REQUEST_TIMEOUT_SECONDS: %w", err)
+	if config.RequestTimeout, err = parseDuration(
+		"REQUEST_TIMEOUT_SECONDS", DefaultRequestTimeoutSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.RequestTimeout = time.Duration(requestTimeoutSeconds) * time.Second
-
-	httpReadTimeoutSeconds, err := strconv.Atoi(
-		getEnv("HTTP_READ_TIMEOUT_SECONDS", DefaultHTTPReadTimeoutSeconds),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid HTTP_READ_TIMEOUT_SECONDS: %w", err)
+	if config.HTTPReadTimeout, err = parseDuration(
+		"HTTP_READ_TIMEOUT_SECONDS", DefaultHTTPReadTimeoutSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.HTTPReadTimeout = time.Duration(httpReadTimeoutSeconds) * time.Second
-
-	httpWriteTimeoutSeconds, err := strconv.Atoi(
-		getEnv("HTTP_WRITE_TIMEOUT_SECONDS", DefaultHTTPWriteTimeoutSeconds),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid HTTP_WRITE_TIMEOUT_SECONDS: %w", err)
+	if config.HTTPWriteTimeout, err = parseDuration(
+		"HTTP_WRITE_TIMEOUT_SECONDS", DefaultHTTPWriteTimeoutSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.HTTPWriteTimeout = time.Duration(httpWriteTimeoutSeconds) * time.Second
-
-	httpIdleTimeoutSeconds, err := strconv.Atoi(
-		getEnv("HTTP_IDLE_TIMEOUT_SECONDS", DefaultHTTPIdleTimeoutSeconds),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid HTTP_IDLE_TIMEOUT_SECONDS: %w", err)
+	if config.HTTPIdleTimeout, err = parseDuration(
+		"HTTP_IDLE_TIMEOUT_SECONDS", DefaultHTTPIdleTimeoutSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.HTTPIdleTimeout = time.Duration(httpIdleTimeoutSeconds) * time.Second
-
-	stsTimeoutSeconds, err := strconv.Atoi(getEnv("STS_TIMEOUT_SECONDS", DefaultSTSTimeoutSeconds))
-	if err != nil {
-		return nil, fmt.Errorf("invalid STS_TIMEOUT_SECONDS: %w", err)
+	if config.STSTimeout, err = parseDuration(
+		"STS_TIMEOUT_SECONDS", DefaultSTSTimeoutSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.STSTimeout = time.Duration(stsTimeoutSeconds) * time.Second
-
-	cleanupIntervalSeconds, err := strconv.Atoi(
-		getEnv("CLEANUP_INTERVAL_SECONDS", DefaultCleanupIntervalSeconds),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid CLEANUP_INTERVAL_SECONDS: %w", err)
+	if config.CleanupInterval, err = parseDuration(
+		"CLEANUP_INTERVAL_SECONDS", DefaultCleanupIntervalSeconds,
+	); err != nil {
+		return nil, err
 	}
-	config.CleanupInterval = time.Duration(cleanupIntervalSeconds) * time.Second
 
 	// Required and optional fields
 	config.EKSClusterID = os.Getenv("EKS_CLUSTER_ID")
@@ -168,4 +151,12 @@ func validatePort(port string) error {
 		return fmt.Errorf("port must be between 1 and 65535")
 	}
 	return nil
+}
+
+func parseDuration(envKey, defaultValue string) (time.Duration, error) {
+	seconds, err := strconv.Atoi(getEnv(envKey, defaultValue))
+	if err != nil {
+		return 0, fmt.Errorf("invalid %s: %w", envKey, err)
+	}
+	return time.Duration(seconds) * time.Second, nil
 }
