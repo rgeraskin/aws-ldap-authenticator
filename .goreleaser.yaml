@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 2
+git:
+  ignore_tags:
+    - helm
+before:
+  hooks:
+    - go mod tidy
+    - go install github.com/google/ko@latest
+builds:
+  - main: cmd/aws-ldap-broker/main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+kos:
+  - repository: rgeraskin/aws-ldap-broker
+    tags:
+      - "{{.Version}}"
+      - latest
+    bare: true
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    main: ./cmd/aws-ldap-broker
+    base_image: gcr.io/distroless/static:nonroot
