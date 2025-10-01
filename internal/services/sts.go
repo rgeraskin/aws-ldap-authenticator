@@ -56,13 +56,13 @@ func NewSTSService(
 func (s *STSService) DecodeEKSToken(eksToken string) (string, error) {
 	const prefix = "k8s-aws-v1."
 	if !strings.HasPrefix(eksToken, prefix) {
-		return "", errors.ErrInvalidTokenPrefix
+		return "", fmt.Errorf("%s: %s", errors.ErrInvalidTokenPrefix, eksToken)
 	}
 
 	b64 := eksToken[len(prefix):]
 	decoded, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", errors.ErrMalformedTokenPayload, err)
+		return "", fmt.Errorf("%s: %v", errors.ErrMalformedTokenPayload, err)
 	}
 
 	return string(decoded), nil
@@ -72,24 +72,24 @@ func (s *STSService) DecodeEKSToken(eksToken string) (string, error) {
 func (s *STSService) ValidatePresignedURL(urlStr string) (*url.URL, url.Values, error) {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: %v", errors.ErrInvalidURL, err)
+		return nil, nil, fmt.Errorf("%s: %v", errors.ErrInvalidURL, err)
 	}
 
 	origin := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 
 	if !s.stsHosts[origin] {
-		return nil, nil, fmt.Errorf("%w: %s", errors.ErrUntrustedSTSHost, origin)
+		return nil, nil, fmt.Errorf("%s: %s", errors.ErrUntrustedSTSHost, origin)
 	}
 
 	qs := parsedURL.Query()
 	action := qs.Get("Action")
 	if action != "GetCallerIdentity" {
-		return nil, nil, fmt.Errorf("%w, got: %s", errors.ErrInvalidSTSAction, action)
+		return nil, nil, fmt.Errorf("%s, got: %s", errors.ErrInvalidSTSAction, action)
 	}
 
 	// Must be SigV4 signed
 	if qs.Get("X-Amz-Algorithm") == "" || qs.Get("X-Amz-Signature") == "" {
-		return nil, nil, errors.ErrMissingSTSSigV4
+		return nil, nil, fmt.Errorf("%s: %s", errors.ErrMissingSTSSigV4, urlStr)
 	}
 
 	return parsedURL, qs, nil
@@ -118,7 +118,7 @@ func (s *STSService) ValidateEKSToken(ctx context.Context, eksToken string) (str
 		}
 	}
 	if !found {
-		return "", errors.ErrMissingSTSSignedHeader
+		return "", fmt.Errorf("%s: %s", errors.ErrMissingSTSSignedHeader, signedHeaders)
 	}
 
 	extraHeaders := map[string]string{
@@ -136,7 +136,7 @@ func (s *STSService) callSTS(
 ) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", presignedURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", errors.ErrSTSCreateRequest, err)
+		return "", fmt.Errorf("%s: %v", errors.ErrSTSCreateRequest, err)
 	}
 
 	for key, value := range extraHeaders {
@@ -147,26 +147,26 @@ func (s *STSService) callSTS(
 
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", errors.ErrSTSRequestFailed, err)
+		return "", fmt.Errorf("%s: %v", errors.ErrSTSRequestFailed, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%w: %d", errors.ErrSTSBadStatus, resp.StatusCode)
+		return "", fmt.Errorf("%s: %d", errors.ErrSTSBadStatus, resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", errors.ErrSTSReadResponse, err)
+		return "", fmt.Errorf("%s: %v", errors.ErrSTSReadResponse, err)
 	}
 
 	var response GetCallerIdentityResponse
 	if err := xml.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("%w: %v", errors.ErrSTSParseResponse, err)
+		return "", fmt.Errorf("%s: %v", errors.ErrSTSParseResponse, err)
 	}
 
 	if response.Result.Arn == "" {
-		return "", errors.ErrSTSNoARN
+		return "", fmt.Errorf("%s: %s", errors.ErrSTSNoARN, string(body))
 	}
 
 	s.logger.Info("STS call successful", "arn", response.Result.Arn)
