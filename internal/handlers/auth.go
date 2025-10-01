@@ -10,10 +10,10 @@ import (
 
 	"github.com/charmbracelet/log"
 
-	"broker/internal/config"
-	"broker/internal/errors"
-	"broker/internal/services"
-	"broker/internal/storage"
+	"aws-ldap-broker/internal/config"
+	"aws-ldap-broker/internal/errors"
+	"aws-ldap-broker/internal/services"
+	"aws-ldap-broker/internal/storage"
 )
 
 // AuthHandler handles authentication requests

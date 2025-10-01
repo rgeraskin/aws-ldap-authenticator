@@ -13,7 +13,7 @@ import (
 
 	"github.com/charmbracelet/log"
 
-	"broker/internal/errors"
+	"aws-ldap-broker/internal/errors"
 )
 
 // STSService handles STS operations

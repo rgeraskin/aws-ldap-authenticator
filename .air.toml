@@ -5,7 +5,7 @@ tmp_dir = "tmp"
 [build]
 args_bin = []
 bin = "./tmp/main"
-cmd = "go build -o ./tmp/main ./cmd/broker/"
+cmd = "go build -o ./tmp/main ./cmd/aws-ldap-broker/"
 delay = 1000
 exclude_dir = [
     "__pycache__",

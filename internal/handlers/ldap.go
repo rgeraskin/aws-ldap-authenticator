@@ -6,7 +6,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/glauth/ldap"
 
-	"broker/internal/storage"
+	"aws-ldap-broker/internal/storage"
 )
 
 // LDAPHandler handles LDAP operations

@@ -11,11 +11,11 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/glauth/ldap"
 
-	"broker/internal/config"
-	"broker/internal/handlers"
-	"broker/internal/middleware"
-	"broker/internal/services"
-	"broker/internal/storage"
+	"aws-ldap-broker/internal/config"
+	"aws-ldap-broker/internal/handlers"
+	"aws-ldap-broker/internal/middleware"
+	"aws-ldap-broker/internal/services"
+	"aws-ldap-broker/internal/storage"
 )
 
 func main() {
