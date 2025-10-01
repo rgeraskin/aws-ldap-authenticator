@@ -14,7 +14,7 @@ type Config struct {
 	PasswordTTL      time.Duration
 	EKSClusterID     string
 	PrefixARN        string
-	SuffixLDAP       string
+	SuffixLDAP       string // ",dc=glauth,dc=com" - pay attention to the leading comma
 	HostHTTP         string
 	PortHTTP         string
 	HostLDAP         string
@@ -31,20 +31,20 @@ type Config struct {
 
 // Default values
 const (
-	DefaultSTSHost              = "https://sts.amazonaws.com"
-	DefaultARNPrefix            = "arn:aws:sts::"
-	DefaultPasswordTTLSeconds   = "900" // 15 minutes
-	DefaultHostHTTP             = "0.0.0.0"
-	DefaultPortHTTP             = "8000"
-	DefaultHostLDAP             = "0.0.0.0"
-	DefaultPortLDAP             = "3893"
-	DefaultLogLevel             = "info"
-	DefaultRequestTimeoutSeconds = "30"
-	DefaultHTTPReadTimeoutSeconds = "10"
+	DefaultSTSHost                 = "https://sts.amazonaws.com"
+	DefaultARNPrefix               = "arn:aws:sts::"
+	DefaultPasswordTTLSeconds      = "900" // 15 minutes
+	DefaultHostHTTP                = "0.0.0.0"
+	DefaultPortHTTP                = "8000"
+	DefaultHostLDAP                = "0.0.0.0"
+	DefaultPortLDAP                = "3893"
+	DefaultLogLevel                = "info"
+	DefaultRequestTimeoutSeconds   = "30"
+	DefaultHTTPReadTimeoutSeconds  = "10"
 	DefaultHTTPWriteTimeoutSeconds = "10"
-	DefaultHTTPIdleTimeoutSeconds = "60"
-	DefaultSTSTimeoutSeconds     = "10"
-	DefaultCleanupIntervalSeconds = "60"
+	DefaultHTTPIdleTimeoutSeconds  = "60"
+	DefaultSTSTimeoutSeconds       = "10"
+	DefaultCleanupIntervalSeconds  = "60"
 )
 
 // Load loads configuration from environment variables
@@ -62,31 +62,41 @@ func Load() (*Config, error) {
 	}
 
 	// Parse durations
-	passwordTTLSeconds, err := strconv.Atoi(getEnv("PASSWORD_TTL_SECONDS", DefaultPasswordTTLSeconds))
+	passwordTTLSeconds, err := strconv.Atoi(
+		getEnv("PASSWORD_TTL_SECONDS", DefaultPasswordTTLSeconds),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid PASSWORD_TTL_SECONDS: %w", err)
 	}
 	config.PasswordTTL = time.Duration(passwordTTLSeconds) * time.Second
 
-	requestTimeoutSeconds, err := strconv.Atoi(getEnv("REQUEST_TIMEOUT_SECONDS", DefaultRequestTimeoutSeconds))
+	requestTimeoutSeconds, err := strconv.Atoi(
+		getEnv("REQUEST_TIMEOUT_SECONDS", DefaultRequestTimeoutSeconds),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid REQUEST_TIMEOUT_SECONDS: %w", err)
 	}
 	config.RequestTimeout = time.Duration(requestTimeoutSeconds) * time.Second
 
-	httpReadTimeoutSeconds, err := strconv.Atoi(getEnv("HTTP_READ_TIMEOUT_SECONDS", DefaultHTTPReadTimeoutSeconds))
+	httpReadTimeoutSeconds, err := strconv.Atoi(
+		getEnv("HTTP_READ_TIMEOUT_SECONDS", DefaultHTTPReadTimeoutSeconds),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid HTTP_READ_TIMEOUT_SECONDS: %w", err)
 	}
 	config.HTTPReadTimeout = time.Duration(httpReadTimeoutSeconds) * time.Second
 
-	httpWriteTimeoutSeconds, err := strconv.Atoi(getEnv("HTTP_WRITE_TIMEOUT_SECONDS", DefaultHTTPWriteTimeoutSeconds))
+	httpWriteTimeoutSeconds, err := strconv.Atoi(
+		getEnv("HTTP_WRITE_TIMEOUT_SECONDS", DefaultHTTPWriteTimeoutSeconds),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid HTTP_WRITE_TIMEOUT_SECONDS: %w", err)
 	}
 	config.HTTPWriteTimeout = time.Duration(httpWriteTimeoutSeconds) * time.Second
 
-	httpIdleTimeoutSeconds, err := strconv.Atoi(getEnv("HTTP_IDLE_TIMEOUT_SECONDS", DefaultHTTPIdleTimeoutSeconds))
+	httpIdleTimeoutSeconds, err := strconv.Atoi(
+		getEnv("HTTP_IDLE_TIMEOUT_SECONDS", DefaultHTTPIdleTimeoutSeconds),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid HTTP_IDLE_TIMEOUT_SECONDS: %w", err)
 	}
@@ -98,7 +108,9 @@ func Load() (*Config, error) {
 	}
 	config.STSTimeout = time.Duration(stsTimeoutSeconds) * time.Second
 
-	cleanupIntervalSeconds, err := strconv.Atoi(getEnv("CLEANUP_INTERVAL_SECONDS", DefaultCleanupIntervalSeconds))
+	cleanupIntervalSeconds, err := strconv.Atoi(
+		getEnv("CLEANUP_INTERVAL_SECONDS", DefaultCleanupIntervalSeconds),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("invalid CLEANUP_INTERVAL_SECONDS: %w", err)
 	}

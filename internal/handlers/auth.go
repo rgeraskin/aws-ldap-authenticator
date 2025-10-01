@@ -60,6 +60,16 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce small body and JSON content type
+	const maxBodySize = 32 * 1024 // 32KB
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	defer r.Body.Close()
+	if ct := r.Header.Get("Content-Type"); ct != "" &&
+		!strings.HasPrefix(strings.ToLower(ct), "application/json") {
+		h.writeError(w, errors.ErrInvalidRequest)
+		return
+	}
+
 	var req ExchangeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.writeError(w, errors.ErrInvalidRequest)
@@ -72,8 +82,13 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, errors.ErrMissingToken)
 		return
 	}
+	eksToken := strings.TrimSpace(*req.EksToken)
+	if eksToken == "" {
+		h.writeError(w, errors.ErrMissingToken)
+		return
+	}
 
-	arn, err := h.stsService.ValidateEKSToken(ctx, *req.EksToken)
+	arn, err := h.stsService.ValidateEKSToken(ctx, eksToken)
 	if err != nil {
 		h.writeError(w, errors.ErrSTSVerification)
 		return
@@ -96,7 +111,7 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	user := &storage.User{
 		ARN:          arn,
 		Username:     h.config.PrefixUsername + username,
-		Password:     *req.EksToken,
+		Password:     eksToken,
 		ExpiresAt:    time.Now().UTC().Add(h.config.PasswordTTL),
 		PrimaryGroup: h.extractPrimaryGroup(arn),
 	}
@@ -127,22 +142,49 @@ func (h *AuthHandler) extractUsernameFromARN(arn string) string {
 }
 
 func (h *AuthHandler) extractPrimaryGroup(arn string) string {
-	trimmed := strings.TrimPrefix(arn, h.config.PrefixARN)
-	parts := strings.Split(trimmed, "_")
-	return parts[0]
+	// Expected formats include:
+	// - arn:aws:sts::<acct>:assumed-role/AWSReservedSSO_<RoleName>_<hash>/<username>
+	// - arn:aws:iam::<acct>:user/<username> (fallback)
+	// We want PrimaryGroup == RoleName for AWSReservedSSO roles.
+
+	// Otherwise, return empty string to omit ou.
+	if !strings.Contains(arn, "assumed-role") {
+		return ""
+	}
+
+	// Assume that last part of ARN is the username
+	parts := strings.Split(arn, "/")
+	if len(parts) < 2 {
+		// Should not happen
+		return ""
+	}
+
+	// assumedRole is like "AWSReservedSSO_<RoleName>_<hash>"
+	assumedRole := parts[len(parts)-2]
+	// Now we have something like "AWSReservedSSO_<RoleName>_<hash>"
+	roleParts := strings.Split(assumedRole, "_")
+	if len(roleParts) < 3 || roleParts[0] != "AWSReservedSSO" {
+		// Don't know is it possible, but anyway
+		return ""
+	}
+	// Now join parts in the middle with "_"
+	roleName := strings.Join(roleParts[1:len(roleParts)-1], "_")
+	return roleName
 }
 
 func (h *AuthHandler) generateBindDNs(user *storage.User) []string {
 	var bindDNs []string
 
+	// If PrimaryGroup present, also include ou variant.
+	if user.PrimaryGroup != "" {
+		bindDNs = append(bindDNs,
+			fmt.Sprintf("cn=%s,ou=%s%s", user.Username, user.PrimaryGroup, h.config.SuffixLDAP),
+		)
+	}
 	bindDNs = append(bindDNs,
-		fmt.Sprintf("cn=%s,ou=%s%s", user.Username, user.PrimaryGroup, h.config.SuffixLDAP),
 		fmt.Sprintf("cn=%s%s", user.Username, h.config.SuffixLDAP),
-		fmt.Sprintf("%s,ou=%s%s", user.Username, user.PrimaryGroup, h.config.SuffixLDAP),
-		fmt.Sprintf("%s%s", user.Username, h.config.SuffixLDAP),
 	)
 
-	// Deduplicate in case of empty suffix
 	return unique(bindDNs)
 }
 

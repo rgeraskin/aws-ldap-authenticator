@@ -13,6 +13,7 @@ import (
 
 	"broker/internal/config"
 	"broker/internal/handlers"
+	"broker/internal/middleware"
 	"broker/internal/services"
 	"broker/internal/storage"
 )
@@ -63,6 +64,13 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/auth", authHandler)
 
+	// Wire middlewares: recovery always, logging only in debug
+	var httpHandler http.Handler = mux
+	if cfg.LogLevel == "debug" {
+		httpHandler = middleware.LoggingMiddleware(logger)(httpHandler)
+	}
+	httpHandler = middleware.RecoveryMiddleware(logger)(httpHandler)
+
 	// Add health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -71,7 +79,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:         cfg.HostHTTP + ":" + cfg.PortHTTP,
-		Handler:      mux,
+		Handler:      httpHandler,
 		ReadTimeout:  cfg.HTTPReadTimeout,
 		WriteTimeout: cfg.HTTPWriteTimeout,
 		IdleTimeout:  cfg.HTTPIdleTimeout,
