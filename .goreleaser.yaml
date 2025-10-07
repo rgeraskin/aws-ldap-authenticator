@@ -27,7 +27,8 @@ changelog:
       - "^chore:"
       - "^ci:"
 kos:
-  - repository: rgeraskin/aws-ldap-authenticator
+  - repositories:
+      - rgeraskin/aws-ldap-authenticator
     tags:
       - "{{.Version}}"
       - latest
