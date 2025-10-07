@@ -1,0 +1,86 @@
+name: Package and Deploy Helm Chart
+
+"on":
+  push:
+    branches:
+      - master
+    paths:
+      - helm/Chart.yaml
+  workflow_dispatch: {}
+
+jobs:
+  package-helm-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 3.14.0
+
+      - name: Extract chart version
+        id: chart-version
+        run: |
+          CHART_VERSION=$(grep '^version:' helm/Chart.yaml | awk '{print $2}')
+          echo "version=${CHART_VERSION}" >> $GITHUB_OUTPUT
+          echo "Chart version: ${CHART_VERSION}"
+
+      - name: Package Helm chart
+        run: |
+          helm repo add vidispine https://vidispine.github.io/hull
+          helm dependency build helm/
+          helm package helm/
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout helm --
+          git pull origin helm
+
+      - name: Generate or update index.yaml
+        run: |
+          helm repo index . --url https://github.com/${{ github.repository }}/raw/helm/
+
+      - name: Commit and push changes
+        run: |
+          git add .
+
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Package Helm chart version ${{ steps.chart-version.outputs.version }}"
+            git push origin helm
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: helm-${{ steps.chart-version.outputs.version }}
+          name: Helm Chart Release ${{ steps.chart-version.outputs.version }}
+          body: |
+            Automated Helm chart package release
+
+            Chart Version: ${{ steps.chart-version.outputs.version }}
+
+            To use this chart:
+            ```bash
+            helm repo add aws-ldap-authenticator https://rgeraskin.github.io/aws-ldap-authenticator/
+            helm install aws-ldap-authenticator aws-ldap-authenticator/aws-ldap-authenticator --version ${{ steps.chart-version.outputs.version }}
+            ```
+          files: aws-ldap-authenticator-${{ steps.chart-version.outputs.version }}.tgz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

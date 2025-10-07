@@ -1,0 +1,12 @@
+apiVersion: v2
+description: Helm chart for aws-ldap-authenticator
+name: aws-ldap-authenticator
+type: application
+
+version: 0.1.0
+appVersion: 0.1.0
+
+dependencies:
+  - name: hull
+    repository: https://vidispine.github.io/hull
+    version: 1.33.0

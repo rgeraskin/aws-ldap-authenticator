@@ -1,0 +1,39 @@
+# https://github.com/vidispine/hull
+hull:
+  config:
+    general:
+      noObjectNamePrefixes: true
+      rbac: false
+  objects:
+    serviceaccount:
+      default:
+        enabled: false
+    deployment:
+      aws-ldap-authenticator:
+        pod:
+          containers:
+            aws-ldap-authenticator:
+              image:
+                repository: rgeraskin/aws-ldap-authenticator
+                tag: 0.1.0
+              env:
+                STS_HOSTS:
+                  value: https://sts.eu-central-1.amazonaws.com
+                EKS_CLUSTER_ID:
+                  value: my-eks-cluster
+                ARN_PREFIXES:
+                  value: "arn:aws:"
+                LDAP_SUFFIX:
+                  value: ",dc=evil,dc=corp"
+                LDAP_PREFIX:
+                  value: cn=aws_iam_
+              ports:
+                http:
+                  containerPort: 3893
+    service:
+      aws-ldap-authenticator:
+        ports:
+          ldap:
+            port: 3893
+            targetPort: 3893
+        type: ClusterIP

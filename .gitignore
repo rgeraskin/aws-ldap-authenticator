@@ -54,4 +54,7 @@ glauth/
 pg_hba.conf
 
 # goreleaser
-/dist/
+/dist
+# helm
+/helm/values-private.yaml
+/helm/charts/*.tgz

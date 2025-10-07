@@ -58,6 +58,19 @@ It listens on `LDAP_HOST:LDAP_PORT` (default `0.0.0.0:3893`).
 
 You can also use [air](https://github.com/air-verse/air) to run the server with hot reloading. Place `.env` file in the root directory and run `air`. Ensure that the `.env` file is respected. I use [mise](https://github.com/jdx/mise) for this.
 
+### Helm
+
+Install via the published Helm chart (Helm 3):
+
+```bash
+helm repo add aws-ldap-authenticator https://rgeraskin.github.io/aws-ldap-authenticator/
+helm repo update
+
+helm install aws-ldap-authenticator aws-ldap-authenticator/aws-ldap-authenticator \
+  --create-namespace --namespace aws-ldap-authenticator \
+  --version 0.1.0
+```
+
 ### Example: use with Postgres (for local dev)
 
 1. Bring up Postgres with Docker and configure LDAP in `pg_hba.conf` to point to this authenticator. See `docker-compose.yml` for the example configuration. `pg_hba.conf` host rule looks like this:
