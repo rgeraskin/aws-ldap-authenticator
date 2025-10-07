@@ -46,22 +46,27 @@ func main() {
 		logger.SetLevel(log.InfoLevel)
 	}
 
-	logger.Info("Starting broker application", "config", cfg)
+	logger.Info("Starting LDAP authenticator", "config", cfg)
 
 	// Initialize services
-	stsService := services.NewSTSService(cfg.STSHosts, cfg.EKSClusterID, cfg.STSTimeout, logger)
+	stsService := services.NewSTSService(
+		cfg.STSHosts,
+		cfg.EKSClusterID,
+		cfg.STSRequestTimeout,
+		logger,
+	)
 
 	// Initialize handlers
 	ldapHandler := handlers.NewLDAPHandler(stsService, cfg, logger)
 
-	// Setup LDAP server
+    // Set up LDAP server
 	ldapServer := ldap.NewServer()
 	ldapServer.BindFunc("", ldapHandler)
 
 	// Start servers
 	go func() {
-		listen := cfg.HostLDAP + ":" + cfg.PortLDAP
-		logger.Info("Starting LDAP server", "host", cfg.HostLDAP, "port", cfg.PortLDAP)
+		listen := cfg.LDAPHost + ":" + cfg.LDAPPort
+		logger.Info("Starting LDAP server", "host", cfg.LDAPHost, "port", cfg.LDAPPort)
 		if err := ldapServer.ListenAndServe(listen); err != nil {
 			logger.Fatal("LDAP server failed", "error", err)
 		}
@@ -72,7 +77,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	// Shutdown LDAP server gracefully
+    // Shut down LDAP server gracefully
 	logger.Info("Shutting down LDAP server...")
 	ldapServer.Close() // This is synchronous and waits for completion
 

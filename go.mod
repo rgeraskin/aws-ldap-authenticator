@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad
+	github.com/joomcode/errorx v1.2.0
 )
 
 require (
