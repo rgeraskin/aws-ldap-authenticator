@@ -1,2 +1,6 @@
 [env]
 _.file = '.env'
+
+[tools]
+"ubi:air-verse/air" = "1.63.0"
+"ubi:goreleaser/goreleaser" = "2.12.5"

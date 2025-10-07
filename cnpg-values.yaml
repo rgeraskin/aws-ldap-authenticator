@@ -1,0 +1,20 @@
+cluster:
+  instances: 1
+  postgresql:
+    pg_hba:
+      - host all /^aws_iam_.* all ldap ldapserver="aws-ldap-authenticator.aws-ldap-authenticator" ldapport=3893 ldapprefix="cn=" ldapsuffix=",dc=evil,dc=corp"
+  services:
+    # I deploy LoadBalancer service to access the Postgres from outside of the cluster
+    additional:
+      - selectorType: rw
+        serviceTemplate:
+          metadata:
+            name: cnpg-lb
+          spec:
+            type: LoadBalancer
+  roles:
+    - name: aws_iam_john.doe
+      ensure: present
+      comment: John Doe
+      login: true
+      superuser: false

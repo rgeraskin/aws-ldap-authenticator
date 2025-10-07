@@ -1,27 +1,27 @@
-### aws-ldap-authenticator
+# AWS LDAP Authenticator
 
-Authenticate in LDAP using AWS EKS tokens.
+Authenticate in LDAP Server using AWS EKS tokens. Like [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator), but for LDAP.
 
-An LDAP Bind authenticator that validates AWS EKS tokens via AWS STS `GetCallerIdentity` and maps the resulting ARN into LDAP `cn` and `ou` semantics. This lets LDAP clients (e.g., Postgres `pg_hba.conf` with `ldap`) authenticate using short‑lived EKS tokens, without storing user passwords.
-
-### Features
-- Validates EKS tokens by calling AWS STS `GetCallerIdentity` against an allowlist of STS hosts
+## Features
+- Validates EKS tokens by calling AWS STS
 - Enforces allowed ARN prefixes
-- Extracts LDAP identity from ARN:
-  - IAM root → `cn=root`
-  - IAM user → `cn=<user>`
-  - STS assumed role → `cn=<session>` and `ou=<role>`
-  - STS federated user → `cn=<user>`
+- Extracts LDAP identity from ARN
 - Optional DN suffix and CN prefix checks for strict Bind DN validation
-- Lightweight LDAP server (plain LDAP on TCP 3893 by default)
+- Lightweight LDAP server
 
-### How it works
+## How it works
+
+It works just like [aws-iam-authenticator](https://github.com/kubernetes-sigs/aws-iam-authenticator).
+
 1. Client performs LDAP Bind with DN `<prefix><username>[,ou=<group>]<suffix>` and password set to an EKS token (`k8s-aws-v1.<...>`).
-2. The server decodes the token to a presigned STS URL, validates it, and calls STS with `x-k8s-aws-id=<EKS_CLUSTER_ID>`.
-3. On success, it receives the caller ARN and validates it against configured rules.
-4. The DN parts are checked against values derived from the ARN.
+1. Server validates LDAP DN against configured suffix.
+1. Server decodes the token to a presigned STS URL, validates it, and calls STS with `x-k8s-aws-id=<EKS_CLUSTER_ID>`.
+1. Server validates STS address against allowlist.
+1. On success, server receives the caller ARN and validates it against configured rules (prefixes).
+1. Server tries to extract LDAP identity from ARN and validates it against configured rules (cn, ou).
 
-### Configuration
+## Configuration
+
 Configure via environment variables:
 
 - `EKS_CLUSTER_ID` (required): EKS cluster name/ID used in the `x-k8s-aws-id` header
@@ -34,13 +34,22 @@ Configure via environment variables:
 - `LOG_LEVEL` (optional): `debug|info|warn|error`. Default: `info`
 - `REQUEST_TIMEOUT_SECONDS` (optional): STS request timeout. Default: `10`
 
-### Build
+## Build
 
 Requirements: Go 1.21+
 
 ```bash
 go build -o dist/aws-ldap-authenticator ./cmd/aws-ldap-authenticator
 ```
+
+To build docker image:
+```bash
+goreleaser release --snapshot --clean
+```
+
+Image will be named as `goreleaser.ko.local:0.1.0-SNAPSHOT-XXX`
+
+## Run
 
 ### Run locally
 
@@ -71,7 +80,9 @@ helm install aws-ldap-authenticator aws-ldap-authenticator/aws-ldap-authenticato
   --version 0.1.0
 ```
 
-### Example: use with Postgres (for local dev)
+## Examples
+
+### Use with Postgres in Docker
 
 1. Bring up Postgres with Docker and configure LDAP in `pg_hba.conf` to point to this authenticator. See `docker-compose.yml` for the example configuration. `pg_hba.conf` host rule looks like this:
 
@@ -86,7 +97,28 @@ helm install aws-ldap-authenticator aws-ldap-authenticator/aws-ldap-authenticato
 1. Get token with `TOKEN=$(aws eks get-token --cluster-name my-eks-cluster --query 'status.token' --output text)`
 1. Login to Postgres with `PGPASSWORD="$TOKEN" pgcli -h 127.0.0.1 -p 5432 postgres -U aws_iam_john.doe`
 
-### Bind DN formats derived from ARN
+### Use with Postgres in Kubernetes ([CNPG](https://cloudnative-pg.io))
+
+CNPG operator should be installed in advance.
+
+1. Deploy the server with Helm:
+   ```bash
+   helm repo add aws-ldap-authenticator https://rgeraskin.github.io/aws-ldap-authenticator/
+   helm repo update
+   helm install aws-ldap-authenticator aws-ldap-authenticator/aws-ldap-authenticator \
+     --create-namespace --namespace aws-ldap-authenticator \
+     --version 0.1.0
+   ```
+1. Deploy the Postgres cluster with Helm. See [cnpg-values.yaml](cnpg-values.yaml) for the example configuration.
+   ```bash
+   helm repo add cnpg https://cloudnative-pg.github.io/charts
+   helm repo update
+   helm install cnpg-cluster cnpg/cluster -f cnpg-values.yaml
+   ```
+1. Get token with `TOKEN=$(aws eks get-token --cluster-name my-eks-cluster --query 'status.token' --output text)`
+1. Login to Postgres with `PGPASSWORD="$TOKEN" pgcli -h <CNPG_LB_IP> -p 5432 postgres -U aws_iam_john.doe`
+
+## Bind DN formats derived from ARN
 
 Possible ARN formats:
 
@@ -103,6 +135,7 @@ If `LDAP_SUFFIX` is set, the DN must end with it. If an `ou` is present, it must
 
 ### Security notes
 - Only allow trusted STS endpoints via `STS_HOSTS`
+- Allow only trusted ARN prefixes via `ARN_PREFIXES`
 - Prefer running behind a network boundary or ingress; consider StartTLS/LDAPS termination in front if needed
 - Tokens are short‑lived; rotate and scope role permissions appropriately
 - Debug logs may include metadata; avoid enabling `debug` in production
