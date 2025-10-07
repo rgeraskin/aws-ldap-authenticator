@@ -1,0 +1,5 @@
+# ignore all but *.tgz and index.yaml
+*
+!*.tgz
+!index.yaml
+!.gitignore
