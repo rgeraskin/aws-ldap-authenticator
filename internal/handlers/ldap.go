@@ -41,7 +41,7 @@ func (h *LDAPHandler) Bind(
 	h.logger.Info("LDAP Bind request", "bindDN", bindDN, "remote_addr", conn.RemoteAddr())
 
 	reportError := func(err error) (ldap.LDAPResultCode, error) {
-		h.logger.Error("LDAP bind failed", "err", err, "bindDN", bindDN)
+		h.logger.Errorf("LDAP bind failed: %s", err.Error())
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
@@ -69,9 +69,7 @@ func (h *LDAPHandler) Bind(
 	defer cancel()
 	arn, err := h.stsService.ValidateEKSToken(ctx, bindPw)
 	if err != nil {
-		// preserve underlying error in logs while returning consistent LDAP code
-		h.logger.Error("EKS token validation failed", "err", err)
-		return reportError(apperrors.ErrTokenValidation)
+		return reportError(err)
 	}
 
 	// Check if ARN matches configured prefix
