@@ -2,27 +2,55 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 
 	"github.com/charmbracelet/log"
 	"github.com/glauth/ldap"
+	"github.com/lainio/err2"
+	"github.com/lainio/err2/try"
 
 	"github.com/rgeraskin/aws-ldap-authenticator/internal/config"
-	apperrors "github.com/rgeraskin/aws-ldap-authenticator/internal/errors"
 	"github.com/rgeraskin/aws-ldap-authenticator/internal/services"
+)
+
+var (
+	ErrTokenMissing = errors.New("EKS token not provided")
+	// LDAP bind DN validation
+	ErrLDAPInvalidBindDNSuffix = errors.New("invalid bind DN suffix")
+	ErrLDAPBindDNArgsNum       = errors.New("invalid number of bind DN attributes")
+	ErrLDAPInvalidBindDNCN     = errors.New("invalid bind DN cn")
+	ErrLDAPInvalidBindDNOU     = errors.New("invalid bind DN ou")
+	// ARN
+	ErrARNIsEmpty                  = errors.New("ARN is empty")
+	ErrARNPrefixNotAllowed         = errors.New("prefix not allowed")
+	ErrARNUsernameNotFound         = errors.New("username not found in ARN")
+	ErrARNInvalidFormatColons      = errors.New("invalid number of colons in ARN")
+	ErrARNInvalidFormatServiceRole = errors.New(
+		"invalid format of service role in ARN",
+	)
+	ErrARNInvalidFormatAssumedRole = errors.New(
+		"invalid format of assumed role in ARN",
+	)
+	ErrARNInvalidFormatFederatedUser = errors.New(
+		"invalid format of federated user in ARN",
+	)
+	ErrARNInvalidFormatNotAllowed = errors.New(
+		"ARN format not supported",
+	)
 )
 
 // LDAPHandler handles LDAP operations
 type LDAPHandler struct {
-	stsService *services.STSService
+	stsService *services.Sts
 	config     *config.Config
 	logger     *log.Logger
 }
 
 // NewLDAPHandler creates a new LDAP handler
 func NewLDAPHandler(
-	stsService *services.STSService,
+	stsService *services.Sts,
 	config *config.Config,
 	logger *log.Logger,
 ) *LDAPHandler {
@@ -37,17 +65,21 @@ func NewLDAPHandler(
 func (h *LDAPHandler) Bind(
 	bindDN, bindPw string,
 	conn net.Conn,
-) (ldap.LDAPResultCode, error) {
-	h.logger.Info("LDAP Bind request", "bindDN", bindDN, "remote_addr", conn.RemoteAddr())
+) (ldapResultCode ldap.LDAPResultCode, err error) {
+	defer func() {
+		if err != nil {
+			h.logger.Errorf("LDAP bind failed: %v", err)
+			err = nil // Clear error - we handle it internally, don't propagate to LDAP library
+		}
+	}()
+	defer err2.Handle(&err, nil)
+	ldapResultCode = ldap.LDAPResultInvalidCredentials
 
-	reportError := func(err error) (ldap.LDAPResultCode, error) {
-		h.logger.Errorf("LDAP bind failed: %s", err.Error())
-		return ldap.LDAPResultInvalidCredentials, nil
-	}
+	h.logger.Info("LDAP Bind request", "bindDN", bindDN, "remote_addr", conn.RemoteAddr())
 
 	// Check if password is empty
 	if bindPw == "" {
-		return reportError(apperrors.ErrTokenMissing)
+		return ldapResultCode, ErrTokenMissing
 	}
 
 	// From the ARN we can extract only the cn (username) and group (ou).
@@ -60,17 +92,14 @@ func (h *LDAPHandler) Bind(
 	// Later we'll trim the suffix from the bindDN and continue validation.
 
 	if h.config.LDAPSuffix != "" && !strings.HasSuffix(bindDN, h.config.LDAPSuffix) {
-		return reportError(apperrors.ErrLDAPInvalidBindDNSuffix)
+		return ldapResultCode, ErrLDAPInvalidBindDNSuffix
 	}
 
 	// Now validate the EKS token
 	// If the token is not expired, AWS will return the ARN.
 	ctx, cancel := context.WithTimeout(context.Background(), h.config.STSRequestTimeout)
 	defer cancel()
-	arn, err := h.stsService.ValidateEKSToken(ctx, bindPw)
-	if err != nil {
-		return reportError(err)
-	}
+	arn := try.To1(h.stsService.ValidateEksToken(ctx, bindPw))
 
 	// Check if ARN matches configured prefix
 	arnMatched := false
@@ -82,16 +111,13 @@ func (h *LDAPHandler) Bind(
 		}
 	}
 	if !arnMatched {
-		return reportError(apperrors.ErrARNPrefixNotAllowed)
+		return ldapResultCode, ErrARNPrefixNotAllowed
 	}
 
 	// Extract cn (username) and group (ou) from ARN
-	username, group, err := h.extractFromARN(arn)
-	if err != nil {
-		return reportError(err)
-	}
+	username, group := try.To2(h.extractFromARN(arn))
 	if username == "" {
-		return reportError(apperrors.ErrARNUsernameNotFound)
+		return ldapResultCode, ErrARNUsernameNotFound
 	}
 	h.logger.Debug("LDAP Bind username and group", "username", username, "group", group)
 
@@ -106,18 +132,18 @@ func (h *LDAPHandler) Bind(
 	attrs := strings.Split(dn, ",")
 	h.logger.Debug("LDAP Bind attributes", "attrs", attrs)
 	if len(attrs) > 2 {
-		return reportError(apperrors.ErrLDAPBindDNArgsNum)
+		return ldapResultCode, ErrLDAPBindDNArgsNum
 	}
 
 	// Check cn: expect the first RDN to equal LDAPPrefix + username, exactly
 	if attrs[0] != h.config.LDAPPrefix+username {
-		return reportError(apperrors.ErrLDAPInvalidBindDNCN)
+		return ldapResultCode, ErrLDAPInvalidBindDNCN
 	}
 
 	// Check ou (if present): expect exact match "ou=" + group
 	if len(attrs) == 2 {
 		if attrs[1] != "ou="+group {
-			return reportError(apperrors.ErrLDAPInvalidBindDNOU)
+			return ldapResultCode, ErrLDAPInvalidBindDNOU
 		}
 	} else {
 		h.logger.Debug("No ou attribute found in bindDN", "bindDN", bindDN)
@@ -127,14 +153,16 @@ func (h *LDAPHandler) Bind(
 	return ldap.LDAPResultSuccess, nil
 }
 
-func (h *LDAPHandler) extractFromARN(arn string) (string, string, error) {
+func (h *LDAPHandler) extractFromARN(arn string) (_ string, _ string, err error) {
+	defer err2.Handle(&err)
+
 	if arn == "" {
-		return "", "", apperrors.ErrARNIsEmpty
+		return "", "", ErrARNIsEmpty
 	}
 
 	parts := strings.SplitN(arn, ":", 6)
 	if len(parts) < 6 {
-		return "", "", apperrors.ErrARNInvalidFormatColons
+		return "", "", ErrARNInvalidFormatColons
 	}
 
 	service := parts[2]  // iam or sts
@@ -159,7 +187,7 @@ func (h *LDAPHandler) extractFromARN(arn string) (string, string, error) {
 		if len(segs) >= 2 {
 			return segs[len(segs)-1], "", nil
 		}
-		return "", "", apperrors.ErrARNUsernameNotFound
+		return "", "", ErrARNUsernameNotFound
 	}
 
 	// IAM Role (Assumed): When calling with temporary creds from sts:AssumeRole
@@ -174,7 +202,7 @@ func (h *LDAPHandler) extractFromARN(arn string) (string, string, error) {
 			sessionName := segs[2]
 			return sessionName, roleName, nil
 		}
-		return "", "", apperrors.ErrARNInvalidFormatAssumedRole
+		return "", "", ErrARNInvalidFormatAssumedRole
 	}
 
 	// Federated User: Temporary creds from SAML, OIDC, or custom federation
@@ -186,7 +214,7 @@ func (h *LDAPHandler) extractFromARN(arn string) (string, string, error) {
 		if len(segs) >= 2 {
 			return segs[len(segs)-1], "", nil
 		}
-		return "", "", apperrors.ErrARNInvalidFormatFederatedUser
+		return "", "", ErrARNInvalidFormatFederatedUser
 	}
 
 	// Service-Linked Role: When AWS services assume roles on your behalf
@@ -200,9 +228,9 @@ func (h *LDAPHandler) extractFromARN(arn string) (string, string, error) {
 			roleName := segs[3]
 			return roleName, serviceHost, nil
 		}
-		return "", "", apperrors.ErrARNInvalidFormatServiceRole
+		return "", "", ErrARNInvalidFormatServiceRole
 	}
 
 	// No other formats are allowed, so return error
-	return "", "", apperrors.ErrARNInvalidFormatNotAllowed
+	return "", "", ErrARNInvalidFormatNotAllowed
 }

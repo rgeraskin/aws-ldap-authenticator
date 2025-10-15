@@ -1,11 +1,19 @@
 package config
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/lainio/err2"
+	"github.com/lainio/err2/try"
+)
+
+var (
+	ErrPortInvalid          = errors.New("port must be between 1 and 65535")
+	ErrEKSClusterIDRequired = errors.New("EKS cluster ID is required")
 )
 
 // Config holds application configuration
@@ -32,8 +40,10 @@ const (
 )
 
 // Load loads configuration from environment variables
-func Load() (*Config, error) {
-	config := &Config{}
+func Load() (config *Config, err error) {
+	defer err2.Handle(&err)
+
+	config = &Config{}
 
 	// Parse STS hosts
 	config.STSHosts = parseCommas("STS_HOSTS", DefaultSTSHost)
@@ -42,12 +52,10 @@ func Load() (*Config, error) {
 	config.ARNPrefixes = parseCommas("ARN_PREFIXES", DefaultARNPrefix)
 
 	// Parse durations
-	var err error
-	if config.STSRequestTimeout, err = parseDuration(
-		"REQUEST_TIMEOUT_SECONDS", DefaultSTSRequestTimeoutSeconds,
-	); err != nil {
-		return nil, err
-	}
+	config.STSRequestTimeout = try.To1(
+		parseDuration(
+			"REQUEST_TIMEOUT_SECONDS", DefaultSTSRequestTimeoutSeconds,
+		))
 
 	// Required and optional fields
 	config.EKSClusterID = os.Getenv("EKS_CLUSTER_ID")
@@ -73,16 +81,14 @@ func parseCommas(envKey, defaultValue string) map[string]bool {
 }
 
 // Validate validates the configuration
-func (c *Config) Validate() error {
+func (c *Config) Validate() (err error) {
+	defer err2.Handle(&err)
+
 	if c.EKSClusterID == "" {
-		return fmt.Errorf("EKS cluster ID is required")
+		return ErrEKSClusterIDRequired
 	}
 
-	if err := validatePort(c.LDAPPort); err != nil {
-		return fmt.Errorf("invalid LDAP port: %w", err)
-	}
-
-	return nil
+	return validatePort(c.LDAPPort)
 }
 
 func getEnv(key, defaultValue string) string {
@@ -92,21 +98,19 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func validatePort(port string) error {
-	p, err := strconv.Atoi(port)
-	if err != nil {
-		return fmt.Errorf("port must be a number: %w", err)
-	}
+func validatePort(port string) (err error) {
+	defer err2.Handle(&err)
+
+	p := try.To1(strconv.Atoi(port))
 	if p < 1 || p > 65535 {
-		return fmt.Errorf("port must be between 1 and 65535")
+		return ErrPortInvalid
 	}
 	return nil
 }
 
-func parseDuration(envKey, defaultValue string) (time.Duration, error) {
-	seconds, err := strconv.Atoi(getEnv(envKey, defaultValue))
-	if err != nil {
-		return 0, fmt.Errorf("invalid %s: %w", envKey, err)
-	}
+func parseDuration(envKey, defaultValue string) (_ time.Duration, err error) {
+	defer err2.Handle(&err)
+
+	seconds := try.To1(strconv.Atoi(getEnv(envKey, defaultValue)))
 	return time.Duration(seconds) * time.Second, nil
 }

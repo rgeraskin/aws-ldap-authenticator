@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/glauth/ldap"
+	"github.com/lainio/err2/try"
 
 	"github.com/rgeraskin/aws-ldap-authenticator/internal/config"
 	"github.com/rgeraskin/aws-ldap-authenticator/internal/handlers"
@@ -23,14 +24,9 @@ func main() {
 	})
 
 	// Load configuration
-	cfg, err := config.Load()
-	if err != nil {
-		logger.Fatal("Failed to load configuration", "error", err)
-	}
+	cfg := try.To1(config.Load())
 
-	if err := cfg.Validate(); err != nil {
-		logger.Fatal("Invalid configuration", "error", err)
-	}
+	try.To(cfg.Validate())
 
 	// Set log level
 	switch cfg.LogLevel {
@@ -49,7 +45,7 @@ func main() {
 	logger.Info("Starting LDAP authenticator", "config", cfg)
 
 	// Initialize services
-	stsService := services.NewSTSService(
+	stsService := services.NewSTS(
 		cfg.STSHosts,
 		cfg.EKSClusterID,
 		cfg.STSRequestTimeout,
@@ -59,7 +55,7 @@ func main() {
 	// Initialize handlers
 	ldapHandler := handlers.NewLDAPHandler(stsService, cfg, logger)
 
-    // Set up LDAP server
+	// Set up LDAP server
 	ldapServer := ldap.NewServer()
 	ldapServer.BindFunc("", ldapHandler)
 
@@ -77,7 +73,7 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-    // Shut down LDAP server gracefully
+	// Shut down LDAP server gracefully
 	logger.Info("Shutting down LDAP server...")
 	ldapServer.Close() // This is synchronous and waits for completion
 

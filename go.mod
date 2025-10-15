@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/glauth/ldap v0.0.0-20240419171521-1f14f5c1b4ad
-	github.com/joomcode/errorx v1.2.0
+	github.com/lainio/err2 v1.2.2
 )
 
 require (
@@ -22,3 +22,5 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/sys v0.13.0 // indirect
 )
+
+replace github.com/lainio/err2 => github.com/rgeraskin/err2 v1.2.3

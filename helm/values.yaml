@@ -15,7 +15,7 @@ hull:
             aws-ldap-authenticator:
               image:
                 repository: rgeraskin/aws-ldap-authenticator
-                tag: 0.1.1
+                tag: 0.1.2
               env:
                 STS_HOSTS:
                   value: https://sts.eu-central-1.amazonaws.com
