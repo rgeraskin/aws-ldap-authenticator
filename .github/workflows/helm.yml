@@ -38,7 +38,7 @@ jobs:
         run: |
           helm repo add vidispine https://vidispine.github.io/hull
           helm dependency build helm/
-          helm package helm/
+          helm package -d charts/ helm/
 
       - name: Configure Git
         run: |
@@ -47,6 +47,7 @@ jobs:
 
           git checkout helm --
           git pull origin helm
+          cp -f charts/* ./
 
       - name: Generate or update index.yaml
         run: |
